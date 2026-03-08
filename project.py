@@ -529,6 +529,3 @@ def show_all_train(staff_id: str):
 arl = create_instance()
 if __name__ == "__main__":
     mcp.run()
-    
-if __name__ == "__main__":
-    mcp.run()
