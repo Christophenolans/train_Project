@@ -341,7 +341,7 @@ def register_staff(staff_id: str, position: str, user_name: str, user_email: str
         return f"เกิดข้อผิดพลาด: {str(e)}" 
 
 @mcp.tool() 
-def add_route(staff_id: str, f_station_name: str, f_station_distance: int, l_station_name: str, l_station_distance: int, train_id: str): 
+def add_route(staff_id: str, f_station_name: str, f_station_distance: int, l_station_name: str, l_station_distance: int): 
     """Add new route"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
@@ -357,8 +357,6 @@ def add_route(staff_id: str, f_station_name: str, f_station_distance: int, l_sta
             arl.add_station(l_station) 
         route.add_station(f_station, int(f_station_distance)) 
         route.add_station(l_station, int(l_station_distance)) 
-        train = arl.search_train_by_num(train_id) 
-        route.add_train(train) 
         result = staff.add_route(arl, route) 
         return { f"data : {result}" } 
     except Exception as e:
