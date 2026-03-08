@@ -322,9 +322,6 @@ class Route:
         self.__distance = sum([s.get_station_distance() for s in self.__stations])
         self.__name = "-".join([self.__f_station.get_station_name(), self.__l_station.get_station_name()]) 
 
-    def add_train(self, train): 
-        self.__train = train 
-
     def set_status(self, status): 
         self.__status = status 
 
@@ -482,7 +479,7 @@ class Stop:
     def trip_enter(self, trip): self.__current_trip.append(trip) 
     def trip_exit(self, trip): self.__current_trip.remove(trip)
 
-class ReservedSeat(): 
+class ReservedSeat: 
     def __init__(self, date, customer, start, end, train, carriage, seat):
         self.__reserved_date = date 
         self.__customer = customer
