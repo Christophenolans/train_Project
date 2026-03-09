@@ -4,7 +4,7 @@ from datetime import datetime
 from models import *
 mcp = FastMCP("Railway")
 
-arl = RailwaySystem()
+arl = create_instance()
 
 # ==========================================
 # 9. MCP
@@ -236,7 +236,33 @@ def cancel_a_booking(customer_id: str, booking_id:str):
         result = customer.cancel_booking(booking) 
         return{ f"Message : {result}, Booking Id : {booking.get_booking_id()}" } 
     except Exception as e:
-        return f"เกิดข้อผิดพลาด: {str(e)}"  
+        return f"เกิดข้อผิดพลาด: {str(e)}"
+    
+@mcp.tool()
+def change_booking(customer_id: str, booking_id: str, date_s: str):
+    """Change date in booking"""
+    try:
+        customer = arl.search_customer_by_num(customer_id) 
+        booking = customer.search_booking_by_num(booking_id)
+
+        result = booking.change_trip(date_s, arl)
+
+        return {f"Message : {result}"}
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
+
+
+@mcp.tool()
+def refund_a_booking(customer_id: str, booking_id: str, payment_code: str):
+    """Refund already paid booking"""
+    try: 
+        customer = arl.search_customer_by_num(customer_id) 
+        booking = customer.search_booking_by_num(booking_id) 
+        payment = arl.search_payment(payment_code)
+        result = customer.refund_booking(booking) 
+        return{ f"Message : {result}, Booking Id : {booking.get_booking_id()} | Amount left: {payment.get_amount()}" } 
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
 
 @mcp.tool() 
 def pay_a_booking(customer_id: str, booking_id:str, payment_code: str): 
@@ -256,13 +282,54 @@ def pay_a_booking(customer_id: str, booking_id:str, payment_code: str):
                f"Arrival Station : {ticket.get_ticket_arrival().get_station_name()}",
                f"Arrival Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_arrival(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}", 
                f"Price : {ticket.get_ticket_price()}"
+               f"Amount left : {payment.get_amount()}"
                } 
     except Exception as e:
         return f"เกิดข้อผิดพลาด: {str(e)}" 
+    
+@mcp.tool()
+def pay_a_booking_with_point(customer_id: str, booking_id: str):
+    """Pay booking with point"""
+    try:
+        customer = arl.search_customer_by_num(customer_id)
+        booking = customer.search_booking_by_num(booking_id)
+
+        result = booking.pay_with_points()
+        ticket = customer.search_ticket_by_num(result)
+
+        return{f"Message : Booking has been paid",
+               f"Created Date : {ticket.get_ticket_create_date().strftime('%d/%m/%Y %H:%M')}",
+               f"Ticket Id : {ticket.get_ticket_id()}",
+               f"Route : {ticket.get_ticket_route().get_route_name()}",
+               f"Departure Station : {ticket.get_ticket_departure().get_station_name()}",
+               f"Departure Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_departure(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}",
+               f"Arrival Station : {ticket.get_ticket_arrival().get_station_name()}",
+               f"Arrival Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_arrival(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}", 
+               f"Price : {ticket.get_ticket_price()}"
+               f"Amount of point left : {customer.get_reward_point()}"
+               } 
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}" 
+    
+
+@mcp.tool()
+def buy_food(customer_id: str, food_name: str, payment_code: str):
+    """Buy food from food name"""
+    try:
+        customer = arl.search_customer_by_num(customer_id)
+        food = arl.search_food_by_name(food_name)
+        payment = arl.search_payment(payment_code)
+
+        customer.buy_food(arl, food)
+        payment.process(food.get_price())
+
+        return {f"{customer_id} bought {food_name} for {food.get_price()}| Amount of money left: {payment.get_amount()}"}
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
 
 @mcp.tool() 
 def show_staff_usage_history(staff_id: str): 
-    """show staff usage history """
+    """Show staff usage history """
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         return { f"data : {staff.get_usage_histories()}" } 
@@ -402,6 +469,7 @@ def add_schedule_time(staff_id: str, route_id: str, hour: int, minute: int):
 
 @mcp.tool()
 def add_trip(staff_id: str, route_id: str, train_id: str, travel_date: str, hour: int, minute: int):
+    """Add trip into system"""
     try:
         staff = arl.search_staff_by_num(staff_id)
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
@@ -436,6 +504,7 @@ def add_trip(staff_id: str, route_id: str, train_id: str, travel_date: str, hour
     
 @mcp.tool()
 def cancel_trip(staff_id: str, trip_id):
+    """Cancel trip out of system"""
     try:
         staff = arl.search_staff_by_num(staff_id)
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized")
@@ -457,6 +526,7 @@ def cancel_trip(staff_id: str, trip_id):
 
 @mcp.tool() 
 def add_train(staff_id:str, t_class:str,  normal_num: int, business_num: int): 
+    """Add train into system"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
@@ -473,6 +543,7 @@ def add_train(staff_id:str, t_class:str,  normal_num: int, business_num: int):
 
 @mcp.tool() 
 def remove_train(staff_id: str, train_id:str): 
+    """Remove train out of system"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
@@ -487,6 +558,7 @@ def remove_train(staff_id: str, train_id:str):
 
 @mcp.tool() 
 def change_fee(staff_id:str, starting_fee: int, fee: int, service_fee: int): 
+    """Change fee of system"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
@@ -499,6 +571,7 @@ def change_fee(staff_id:str, starting_fee: int, fee: int, service_fee: int):
 
 @mcp.tool() 
 def show_all_route(staff_id: str): 
+    """Show all route in system include decommissioned one for admin"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized") 
@@ -508,6 +581,7 @@ def show_all_route(staff_id: str):
 
 @mcp.tool()
 def show_all_trip(staff_id: str):
+    """Show all trip in system for admin"""
     try:
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized")
@@ -517,6 +591,7 @@ def show_all_trip(staff_id: str):
 
 @mcp.tool()
 def show_all_train(staff_id: str): 
+    """Show all train in system include decommissioned one for ad min"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized") 
@@ -524,6 +599,5 @@ def show_all_train(staff_id: str):
     except Exception as e:
         return f"เกิดข้อผิดพลาด: {str(e)}"  
 
-arl = create_instance()
 if __name__ == "__main__":
     mcp.run()

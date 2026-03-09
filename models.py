@@ -52,6 +52,7 @@ class RailwaySystem:
         self.__schedules = []
         self.__trips = []
         self.__payments = []
+        self.__foods = []
         self.__starting_fee = 30 
         self.__fee = 5 
         self.__service_fee = 10
@@ -107,6 +108,9 @@ class RailwaySystem:
                 raise KeyError(f"There is this payment code already") 
         self.__payments.append(payment)
 
+    def add_food(self, food):
+        self.__foods.append(food)
+
 #======REMOVE=======
     def remove_route(self, route): 
         for n_route in self.__routes: 
@@ -137,6 +141,13 @@ class RailwaySystem:
                 n_trip.set_status(TripStatus.CANCELLED)
                 return
         raise KeyError("Trip not found")
+    
+    def sell_food(self, food):
+        for n_food in self.__foods:
+            if n_food.get_name() == food.get_name():
+                self.__foods.remove(food)
+                return
+        raise KeyError("Food not found")
 
 #======SHOW======
     def show_admin_route(self): 
@@ -280,6 +291,12 @@ class RailwaySystem:
             if payment.get_id() == num:
                 return payment
         raise KeyError("Payment not found")
+    
+    def search_food_by_name(self, num):
+        for food in self.__foods:
+            if food.get_name() == num:
+                return food
+        raise KeyError("Food not found")
 
 #======CHANGE======
     def change_fee(self, starting, fee, service): 
@@ -702,8 +719,6 @@ class Customer(User):
 
     def cancel_booking(self, booking): 
         trans = Transaction() 
-        date = booking.get_booking_date().date() 
-        segment = booking.get_segment() 
         try: 
             result = booking.cancel() 
             trans.commit() 
@@ -711,6 +726,27 @@ class Customer(User):
             trans.rollback() 
             raise e 
         return result
+    
+    def refund_booking(self, booking):
+        trans = Transaction() 
+        try: 
+            result = booking.refund() 
+            trans.commit() 
+        except Exception as e: 
+            trans.rollback() 
+            raise e 
+        return result
+    
+    def buy_food(self, system, food):
+        count = 0
+        for ticket in self.__tickets:
+           if ticket.get_ticket_status() == TicketStatus.CONFIRMED:
+               count += 1
+        if count > 0:
+            system.sell_food(food)
+        else:
+            raise ValueError("No ticket available")
+           
     
     def remove_ticket(self, ticket):
         self.__tickets.remove(ticket)
@@ -914,6 +950,24 @@ class Booking:
         self.__trip.reserve(self.__date.date(), self.__customer, dep, arr, self.__carriage, self.__seat) 
         self.__payment = None
 
+    def pay_with_points(self):
+        if self.__booking_status != BookingStatus.PENDING: 
+            raise ValueError("Cannot pay") 
+        departure_time = self.__trip.get_arrival_time(self.__departure_s, self.__date.date()) 
+        if departure_time < datetime.now(): 
+            self.__booking_status = BookingStatus.EXPIRED 
+            raise ValueError("Booking expired") 
+        self.__booking_status = BookingStatus.PAID 
+        if self.__customer.get_reward_point() < self.__distance:
+            raise ValueError("Not enough points")
+        self.__customer.deduct_points(self.__distance)
+        self.__booking_price = 0
+
+        ticket = Ticket(self.__customer, self.__trip, self.__departure_s, self.__arrival_s, self.__train, self.__carriage, self.__seat, self.__booking_price, "Point") 
+        self.__customer.add_ticket(ticket)  
+        self.__confirm_date = datetime.now() 
+        return ticket.get_ticket_id() 
+
     def pay(self, payment: Payment, code): 
         if self.__booking_status != BookingStatus.PENDING: 
             raise ValueError("Cannot pay") 
@@ -927,9 +981,6 @@ class Booking:
             raise ValueError(f"Invalid payment validation code")
         if payment.get_amount() < price:
             raise ValueError(f"Insufficient payment amount. Required: {price}")
-        if self.__customer.get_reward_point() >= 100: 
-            price = 0 
-            self.__customer.deduct_points(100) 
         payment.process(price)
         self.__payment = payment
         ticket = Ticket(self.__customer, self.__trip, self.__departure_s, self.__arrival_s, self.__train, self.__carriage, self.__seat, price, payment) 
@@ -947,25 +998,52 @@ class Booking:
             self.__booking_status = BookingStatus.EXPIRED 
             result = "expired" 
         else: 
-            if self.__booking_status == BookingStatus.PAID: 
-                if self.__booking_price == 0: 
-                    self.__customer.collect_points(100) 
-                else: 
-                    self.__customer.deduct_points(self.__distance)
-                    self.__payment.process(-self.__booking_price) 
-                    for ticket in list(self.__customer.get_user_tickets()):
-                        if ticket.get_ticket_customer().get_user_id() == self.__customer.get_user_id():
-                            if ticket.get_ticket_departure().get_station_name() == self.__departure_s.get_station_name():
-                                if ticket.get_ticket_arrival().get_station_name() == self.__arrival_s.get_station_name():
-                                    self.__customer.remove_ticket(ticket)
-                self.__booking_status = BookingStatus.REFUNDED 
-                result = f"Booking Id: {self.__id} refunded" 
+            self.__booking_status = BookingStatus.CANCELLED 
+            result = f"Booking Id: {self.__id} cancelled" 
+        self.__cancel_date = datetime.now() 
+        self.__trip.release(self.__date.date(), dep, arr, self.__carriage, self.__seat) 
+        return result
+    
+    def refund(self):
+        dep, arr = self.__segment 
+        if self.__booking_status not in [BookingStatus.PAID]: 
+            raise ValueError("Cannot refund booking") 
+        departure_time = self.__trip.get_arrival_time(self.__departure_s, self.__date.date()) 
+        if departure_time < datetime.now(): 
+            self.__booking_status = BookingStatus.EXPIRED 
+            result = "expired" 
+        else: 
+            if self.__booking_price == 0: 
+                self.__customer.collect_points(100) 
             else: 
-                self.__booking_status = BookingStatus.CANCELLED 
-                result = f"Booking Id: {self.__id} cancelled" 
-            self.__cancel_date = datetime.now() 
-            self.__trip.release(self.__date.date(), dep, arr, self.__carriage, self.__seat) 
-        return result 
+                self.__customer.deduct_points(self.__distance)
+                self.__payment.process(-self.__booking_price) 
+                for ticket in list(self.__customer.get_user_tickets()):
+                    if ticket.get_ticket_customer().get_user_id() == self.__customer.get_user_id():
+                        if ticket.get_ticket_departure().get_station_name() == self.__departure_s.get_station_name():
+                            if ticket.get_ticket_arrival().get_station_name() == self.__arrival_s.get_station_name():
+                                self.__customer.remove_ticket(ticket)
+            self.__booking_status = BookingStatus.REFUNDED 
+            result = f"Booking Id: {self.__id} refunded"  
+        self.__cancel_date = datetime.now() 
+        self.__trip.release(self.__date.date(), dep, arr, self.__carriage, self.__seat) 
+        return result
+    
+    def change_trip(self, date_s, system):
+        dep, arr = self.__segment
+        new_date = datetime.strptime(date_s, "%Y-%m-%d")
+        depart_time = self.__trip.get_time()
+        before_trip = self.__trip
+        self.__trip.release(self.__date.date(), dep, arr, self.__carriage, self.__seat)
+        code = f"{self.__route.get_route_id()}-{new_date.strftime('%Y%m%d')}-{depart_time.strftime('%H%M')}"
+        self.__date = new_date
+        trip = system.search_trip(code)
+        self.__trip = trip
+        self.__trip.reserve(self.__date.date(), self.__customer, dep, arr, self.__carriage, self.__seat)
+    
+        result = f"Booking Id: {self.__id} | before : {before_trip.get_trip_id()} | after : {self.__trip.get_trip_id()}"
+        return result
+
 
     def get_booking_create_date(self): return self.__create_date 
     def get_booking_cancel_date(self): return self.__cancel_date 
@@ -1070,6 +1148,16 @@ class Transaction:
         for action in reversed(self.__rollback_actions): 
             action()
 
+class Food:
+    def __init__(self, name, price):
+        self.__name = name
+        self.__price = price
+
+    def get_name(self):
+        return self.__name
+    def get_price(self):
+        return self.__price
+
 # ==========================================
 # 8. INITIALIZATION
 # ==========================================
@@ -1102,6 +1190,12 @@ def create_instance():
     Sch1 = Schedule(Route1) 
     Sch2 = Schedule(Route2) 
     Sch3 = Schedule(Route3) 
+
+    burger = Food("Burger", 50)
+    chicken = Food("Fried Chicken", 100)
+
+    arl.add_food(burger)
+    arl.add_food(chicken)
     
     Sch1.add_standard_time(8, 30) 
     Sch1.add_standard_time(9, 30) 
