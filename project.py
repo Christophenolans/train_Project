@@ -4,7 +4,7 @@ from datetime import datetime
 from models import *
 mcp = FastMCP("Railway")
 
-arl = RailwaySystem()
+# arl = RailwaySystem()
 
 # ==========================================
 # 9. MCP
