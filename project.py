@@ -236,7 +236,33 @@ def cancel_a_booking(customer_id: str, booking_id:str):
         result = customer.cancel_booking(booking) 
         return{ f"Message : {result}, Booking Id : {booking.get_booking_id()}" } 
     except Exception as e:
-        return f"เกิดข้อผิดพลาด: {str(e)}"  
+        return f"เกิดข้อผิดพลาด: {str(e)}"
+    
+@mcp.tool()
+def change_booking(customer_id: str, booking_id: str, date_s: str):
+    """Change date in booking"""
+    try:
+        customer = arl.search_customer_by_num(customer_id) 
+        booking = customer.search_booking_by_num(booking_id)
+
+        result = booking.change_trip(date_s, arl)
+
+        return {f"Message : {result}"}
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
+
+
+@mcp.tool()
+def refund_a_booking(customer_id: str, booking_id: str, payment_code: str):
+    """Refund already paid booking"""
+    try: 
+        customer = arl.search_customer_by_num(customer_id) 
+        booking = customer.search_booking_by_num(booking_id) 
+        payment = arl.search_payment(payment_code)
+        result = customer.refund_booking(booking) 
+        return{ f"Message : {result}, Booking Id : {booking.get_booking_id()} | Amount left: {payment.get_amount()}" } 
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
 
 @mcp.tool() 
 def pay_a_booking(customer_id: str, booking_id:str, payment_code: str): 
@@ -256,9 +282,50 @@ def pay_a_booking(customer_id: str, booking_id:str, payment_code: str):
                f"Arrival Station : {ticket.get_ticket_arrival().get_station_name()}",
                f"Arrival Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_arrival(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}", 
                f"Price : {ticket.get_ticket_price()}"
+               f"Amount left : {payment.get_amount()}"
                } 
     except Exception as e:
         return f"เกิดข้อผิดพลาด: {str(e)}" 
+    
+@mcp.tool()
+def pay_a_booking_with_point(customer_id: str, booking_id: str):
+    """Pay booking with point"""
+    try:
+        customer = arl.search_customer_by_num(customer_id)
+        booking = customer.search_booking_by_num(booking_id)
+
+        result = booking.pay_with_points()
+        ticket = customer.search_ticket_by_num(result)
+
+        return{f"Message : Booking has been paid",
+               f"Created Date : {ticket.get_ticket_create_date().strftime('%d/%m/%Y %H:%M')}",
+               f"Ticket Id : {ticket.get_ticket_id()}",
+               f"Route : {ticket.get_ticket_route().get_route_name()}",
+               f"Departure Station : {ticket.get_ticket_departure().get_station_name()}",
+               f"Departure Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_departure(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}",
+               f"Arrival Station : {ticket.get_ticket_arrival().get_station_name()}",
+               f"Arrival Time : {ticket.get_ticket_trip().get_arrival_time(ticket.get_ticket_arrival(), ticket.get_ticket_date().date()).strftime('%d/%m/%Y %H:%M')}", 
+               f"Price : {ticket.get_ticket_price()}"
+               f"Amount of point left : {customer.get_reward_point()}"
+               } 
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}" 
+    
+
+@mcp.tool()
+def buy_food(customer_id: str, food_name: str, payment_code: str):
+    """buy food"""
+    try:
+        customer = arl.search_customer_by_num(customer_id)
+        food = arl.search_food_by_name(food_name)
+        payment = arl.search_payment(payment_code)
+
+        customer.buy_food(arl, food)
+        payment.process(food.get_price())
+
+        return {f"{customer_id} bought {food_name} for {food.get_price()}| Amount of money left: {payment.get_amount()}"}
+    except Exception as e:
+        return f"เกิดข้อผิดพลาด: {str(e)}"
 
 @mcp.tool() 
 def show_staff_usage_history(staff_id: str): 
