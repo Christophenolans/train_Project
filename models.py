@@ -142,11 +142,10 @@ class RailwaySystem:
                 return
         raise KeyError("Trip not found")
     
-    def sell_food(self, food):
+    def remove_food(self, food):
         for n_food in self.__foods:
-            if n_food.get_name() == food.get_name():
+            if n_food.get_food_name() == food.get_food_name():
                 self.__foods.remove(food)
-                return
         raise KeyError("Food not found")
 
 #======SHOW======
@@ -251,7 +250,7 @@ class RailwaySystem:
     
     def search_trip(self, trip_id):
         for trip in self.__trips:
-            if trip.get_trip_id() == trip_id:
+            if trip.get_trip_id() == trip_id and trip.get_status() == TripStatus.OPEN:
                 return trip
         raise KeyError("Trip not found") 
 
@@ -740,12 +739,10 @@ class Customer(User):
     def buy_food(self, system, food):
         count = 0
         for ticket in self.__tickets:
-           if ticket.get_ticket_status() == TicketStatus.CONFIRMED:
+           if ticket.get_ticket_status == TicketStatus.CONFIRMED:
                count += 1
         if count > 0:
-            system.sell_food(food)
-        else:
-            raise ValueError("No ticket available")
+            system.remove_food(food)
            
     
     def remove_ticket(self, ticket):
