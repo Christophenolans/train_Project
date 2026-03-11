@@ -4,7 +4,7 @@ from datetime import datetime
 from models import *
 mcp = FastMCP("Railway")
 
-# arl = RailwaySystem()
+arl = create_instance()
 
 # ==========================================
 # 9. MCP
@@ -408,7 +408,7 @@ def register_staff(staff_id: str, position: str, user_name: str, user_email: str
         return f"เกิดข้อผิดพลาด: {str(e)}" 
 
 @mcp.tool() 
-def add_route(staff_id: str, f_station_name: str, f_station_distance: int, l_station_name: str, l_station_distance: int): 
+def add_route(staff_id: str, f_station_name: str, l_station_name: str, l_station_distance: int): 
     """Add new route"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
@@ -422,7 +422,7 @@ def add_route(staff_id: str, f_station_name: str, f_station_distance: int, l_sta
         except KeyError: 
             l_station = Station(l_station_name) 
             arl.add_station(l_station) 
-        route.add_station(f_station, int(f_station_distance)) 
+        route.add_station(f_station, 0) 
         route.add_station(l_station, int(l_station_distance)) 
         result = staff.add_route(arl, route) 
         return { f"data : {result}" } 
@@ -436,9 +436,9 @@ def remove_route(staff_id: str, route_id: str):
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
         route = arl.search_route_any_status(route_id) 
-        for trip in arl.get_trips():
-            if trip.get_route().get_route_id() == route.get_route_id():
-                staff.cancel_trip(arl, trip)
+        trips_to_cancel = [t for t in arl.get_trips() if t.get_route().get_route_id() == route.get_route_id()]
+        for trip in trips_to_cancel:
+            staff.cancel_trip(arl, trip)
         result = staff.remove_route(arl, route) 
         return { f"data : {result}" } 
     except Exception as e:
@@ -533,6 +533,8 @@ def add_train(staff_id:str, t_class:str,  normal_num: int, business_num: int):
             train = SpeederTrain(normal_num, business_num)
         elif t_class.lower() == "splinter":
             train = SplinterTrain(normal_num, business_num)
+        else:
+            raise KeyError("Wrong train class")
         result = staff.add_train(arl, train) 
         return { f"data : {result}" } 
     except Exception as e:
@@ -540,6 +542,7 @@ def add_train(staff_id:str, t_class:str,  normal_num: int, business_num: int):
 
 @mcp.tool() 
 def remove_train(staff_id: str, train_id:str): 
+    """Remove train from system"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, SystemAdministrator): raise ValueError("Unauthorized") 
@@ -565,7 +568,8 @@ def change_fee(staff_id:str, starting_fee: int, fee: int, service_fee: int):
         return f"เกิดข้อผิดพลาด: {str(e)}" 
 
 @mcp.tool() 
-def show_all_route(staff_id: str): 
+def show_all_route(staff_id: str):
+    """Show all route to admin"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized") 
@@ -575,6 +579,7 @@ def show_all_route(staff_id: str):
 
 @mcp.tool()
 def show_all_trip(staff_id: str):
+    """Show all trip to admin"""
     try:
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized")
@@ -584,6 +589,7 @@ def show_all_trip(staff_id: str):
 
 @mcp.tool()
 def show_all_train(staff_id: str): 
+    """Show all train to admin"""
     try: 
         staff = arl.search_staff_by_num(staff_id) 
         if not isinstance(staff, (SystemAdministrator, StationOfficer)): raise ValueError("Unauthorized") 
@@ -591,6 +597,5 @@ def show_all_train(staff_id: str):
     except Exception as e:
         return f"เกิดข้อผิดพลาด: {str(e)}"  
 
-arl = create_instance()
 if __name__ == "__main__":
     mcp.run()

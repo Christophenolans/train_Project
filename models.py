@@ -250,7 +250,7 @@ class RailwaySystem:
     
     def search_trip(self, trip_id):
         for trip in self.__trips:
-            if trip.get_trip_id() == trip_id:
+            if trip.get_trip_id() == trip_id and trip.get_status() == TripStatus.OPEN:
                 return trip
         raise KeyError("Trip not found") 
 
@@ -742,7 +742,7 @@ class Customer(User):
            if ticket.get_ticket_status == TicketStatus.CONFIRMED:
                count += 1
         if count > 0:
-            system.remove(food)
+            system.remove_food(food)
            
     
     def remove_ticket(self, ticket):
